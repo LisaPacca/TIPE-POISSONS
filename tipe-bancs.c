@@ -48,7 +48,6 @@ SDL_Color COULEURS[] = {
     {0,255,255,255}    // cyan
 };
 
-//fonctions a refaire 
 Vector2 vec_add(Vector2 a, Vector2 b)
     { return (Vector2){a.x+b.x,a.y+b.y}; }
 

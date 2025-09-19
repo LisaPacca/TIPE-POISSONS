@@ -48,6 +48,7 @@ SDL_Color COULEURS[] = {
     {0,255,255,255}    // cyan
 };
 
+//fonctions a refaire 
 Vector2 vec_add(Vector2 a, Vector2 b)
     { return (Vector2){a.x+b.x,a.y+b.y}; }
 
@@ -68,58 +69,69 @@ void poisson_init(Poisson* p, float x, float y, float angle, Setting* s){
 
 void zone_repulsion(Poisson* p, Poisson voisin[NB_POISSONS]){
     Vector2 d={0.0 , 0.0};
+    int count = 0;
     for(int j = 0; j<p->setting->nb_poisson; j++){
         Poisson* v = &voisin[j];
         if(v == p) { continue; }
         float dist = distance(p->pos,v->pos);
         if(dist < RAYON_REPULSION){
+            count++;
             printf("repulsion \n");
             d.x += (p->pos.x - v->pos.x)/distance(p->pos,v->pos);
             d.y += (p->pos.y - v->pos.y)/distance(p->pos,v->pos);
-            p->vitesse.x = d.x*p->setting->v_norm ;
-            p->vitesse.y = d.y*p->setting->v_norm ;
+          
         }
+    }
+    if(count!=0){
+        p->vitesse.x = d.x*p->setting->v_norm ;
+        p->vitesse.y = d.y*p->setting->v_norm ;
     }
 }
 
 //pas l'air de faire grand chose si foutre le bordel
 void zone_orientation(Poisson* p, Poisson voisin[NB_POISSONS]){
     Vector2 d={0.0 , 0.0};
+    int count = 0;
     for(int j = 0; j<p->setting->nb_poisson; j++){
         Poisson* v = &voisin[j];
-        if(v == p) { continue; }
         float dist = distance(p->pos,v->pos);
         if(dist < RAYON_ALIGNEMENT && dist > RAYON_REPULSION){
+            count++;
             printf("orientation \n");
             d.x += v->vitesse.x/v->setting->v_norm;
             d.y += v->vitesse.y/v->setting->v_norm;
-            p->vitesse.x = d.x*p->setting->v_norm;
-            p->vitesse.y = d.y*p->setting->v_norm;
         }
+    }
+    if(count != 0 ){
+        p->vitesse.x = d.x*p->setting->v_norm;
+        p->vitesse.y = d.y*p->setting->v_norm;
     }
 }
 
 
 void zone_attration(Poisson* p, Poisson voisin[NB_POISSONS]){
     Vector2 d={0.0 , 0.0};
+    int count = 0;
     for(int j = 0; j<p->setting->nb_poisson; j++){
         Poisson* v = &voisin[j];
         if(v == p) { continue; }
         float dist = distance(p->pos,v->pos);
         if(dist < RAYON_ATTRACTION && dist > RAYON_ALIGNEMENT){
+            count++;
             printf("alignement \n");
             d.x += (v->pos.x - p->pos.x)/distance(v->pos,p->pos);
             d.y += (v->pos.y - p->pos.y)/distance(v->pos,p->pos);
-            p->vitesse.x = d.x*p->setting->v_norm;
-            p->vitesse.y = d.y*p->setting->v_norm;
         }
+    }
+    if(count != 0){
+        p->vitesse.x = d.x*p->setting->v_norm;
+        p->vitesse.y = d.y*p->setting->v_norm;
     }
 }
 
 
 
 
-// fonction des cercles concentriques : a modifier 
 void poisson_deplacer(Poisson* p){
     p->pos = vec_add(p->pos, p->vitesse);
 
@@ -133,7 +145,7 @@ void poisson_deplacer(Poisson* p){
     }
 }
 
-//dessine un cercle ? 
+//dessine un cercle
 void draw_circle(SDL_Renderer* renderer, int cx, int cy, int r) {
     // Dessiner le cercle (boule)
     for(int w = -r; w <= r; w++) {
@@ -183,7 +195,7 @@ int main(){
             poisson_deplacer(&poissons[i]);
             zone_repulsion(&poissons[i],poissons);
             //zone_orientation(&poissons[i],poissons);
-            zone_attration(&poissons[i],poissons);
+            //zone_attration(&poissons[i],poissons);
         }
 
         SDL_SetRenderDrawColor(renderer,0,0,0,255);

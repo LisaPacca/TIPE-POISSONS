@@ -21,7 +21,7 @@
 #define BLIND M_PI
 
 typedef struct {
-    floa(4/3)*t x, y;
+    float x, y;
 } Vector2;//nom à changer
 
 typedef struct {

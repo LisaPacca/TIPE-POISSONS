@@ -11,11 +11,13 @@
 
 //valeurs aleatoires
 #define NB_POISSONS 100
-#define RAYON_ATTRACTION 100
-#define RAYON_ORIENTATION 40
-#define RAYON_REPULSION 30
-#define V_INITIALE 2.5
+#define RAYON_ATTRACTION 120
+#define RAYON_ORIENTATION 90
+#define RAYON_REPULSION 25
+#define V_INITIALE 3
 #define TAILLE_POISSON 5
+#define BRUIT (float)0.2f
+#define BLIND M_PI
 
 //vecteur dans le plan 
 typedef struct {
@@ -39,7 +41,7 @@ SDL_Color COULEURS[] = {
     {0,255,255,255}    // cyan
 };
 
-//fonctions a refaire 
+ 
 Vector2 vec_add(Vector2 a, Vector2 b)
     { return (Vector2){a.x+b.x,a.y+b.y}; }
 
@@ -47,41 +49,61 @@ float distance(Vector2 a, Vector2 b){
     return sqrtf((a.x-b.x)*(a.x-b.x) + (a.y-b.y)*(a.y-b.y));
 }
 
-float norme(Vector2 v){
-    return sqrtf(v.x*v.x + v.y*v.y);
+float norme(Vector2* v){
+    return sqrtf(v->x*v->x + v->y*v->y);
 }
 
 void poisson_init(Poisson* p, float x, float y, float angle){
     p->pos = (Vector2){x,y};
     p->vitesse = (Vector2){cosf(angle)*V_INITIALE, sinf(angle)*V_INITIALE}; 
-    
 }
 
-Vector2 zone_repulsion(Poisson* p, Poisson* v, Vector2 d){
-    d.x += (p->pos.x - v->pos.x)/distance(p->pos,v->pos);
-    d.y += (p->pos.y - v->pos.y)/distance(p->pos,v->pos);
+Vector2* zone_repulsion(Poisson* p, Poisson* v, Vector2* d){
+    if (distance(p->pos,v->pos)!= 0) {
+        d->x += (p->pos.x - v->pos.x)/distance(p->pos,v->pos);
+        d->y += (p->pos.y - v->pos.y)/distance(p->pos,v->pos);
+    }
     return d ; 
 }
 
-//pas l'air de faire grand chose si foutre le bordel
-Vector2 zone_orientation(Poisson* p, Poisson* v, Vector2 d){
-    d.x += v->vitesse.x/V_INITIALE;
-    d.y += v->vitesse.y/V_INITIALE;
+Vector2* zone_orientation(Poisson* p, Poisson* v, Vector2* d){
+    d->x += v->vitesse.x/V_INITIALE;
+    d->y += v->vitesse.y/V_INITIALE;
     return d; 
 }
 
-
-Vector2 zone_attration(Poisson* p, Poisson* v, Vector2 d){
-    d.x += (v->pos.x - p->pos.x)/distance(v->pos,p->pos);
-    d.y += (v->pos.y - p->pos.y)/distance(v->pos,p->pos);
-    return d; 
+Vector2* zone_attraction(Poisson* p, Poisson* v, Vector2* d){
+    if (distance(v->pos,p->pos)!= 0) {
+        d->x += (v->pos.x - p->pos.x)/distance(v->pos,p->pos);
+        d->y += (v->pos.y - p->pos.y)/distance(v->pos,p->pos);
+    }
+    return d ; 
 }
 
+Vector2 changement_direction (Poisson* p, Vector2 *d){
+    float n = norme(d); 
+    Vector2 cible = { (d->x/n)*V_INITIALE , (d->y/n)*V_INITIALE };
+    float alpha = 0.1; 
+    p->vitesse.x = (1 - alpha)*p->vitesse.x + alpha*cible.x;
+    p->vitesse.y = (1 - alpha)*p->vitesse.y + alpha*cible.y;
+    float n_p = sqrtf(p->vitesse.x*p->vitesse.x + p->vitesse.y*p->vitesse.y);
+    if (n_p > 0) {
+        p->vitesse.x = (p->vitesse.x / n_p) * V_INITIALE;
+        p->vitesse.y = (p->vitesse.y / n_p) * V_INITIALE;
+    }
+    return p->vitesse;
+}
 
 void mouvement(Poisson* p, Poisson voisin[NB_POISSONS]){
-    Vector2 d_r={0.0 , 0.0};
-    Vector2 d_a={0.0 , 0.0};
-    Vector2 d_o={0.0 , 0.0};
+    Vector2* d_r= malloc(sizeof(Vector2)); 
+    Vector2* d_a= malloc(sizeof(Vector2)); 
+    Vector2* d_o= malloc(sizeof(Vector2)); 
+    d_r->x = 0.0; 
+    d_r->y = 0.0;
+    d_a->x = 0.0; 
+    d_a->y = 0.0;
+    d_o->x = 0.0; 
+    d_o->y = 0.0;
     int count_r = 0;
     int count_o = 0;
     int count_a = 0;
@@ -90,51 +112,76 @@ void mouvement(Poisson* p, Poisson voisin[NB_POISSONS]){
         if(v == p) { continue; }
         float dist = distance(p->pos,v->pos);
         if(dist < RAYON_REPULSION){
-            d_r.x += zone_repulsion(p,v,d_r).x;
-            d_r.y +=zone_repulsion(p,v,d_r).y;
+            d_r->x += zone_repulsion(p,v,d_r)->x;
+            d_r->y += zone_repulsion(p,v,d_r)->y;
             count_r ++;
         }
-        if(dist < RAYON_ORIENTATION){
-            d_o.x += zone_orientation(p,v,d_o).x;
-            d_o.y += zone_orientation(p,v,d_o).y;
+        else if(dist < RAYON_ORIENTATION && dist > RAYON_REPULSION){
+            d_o->x += zone_orientation(p,v,d_o)->x;
+            d_o->y += zone_orientation(p,v,d_o)->y;
             count_o ++ ; 
         }
-        if(dist < RAYON_ATTRACTION){
-            d_a.x += zone_attration(p,v,d_a).x;
-            d_a.y += zone_orientation(p,v,d_a).y;
+        else if(dist < RAYON_ATTRACTION && dist > RAYON_ORIENTATION){
+            d_a->x += zone_attraction(p,v,d_a)->x;
+            d_a->y += zone_attraction(p,v,d_a)->y;
             count_a ++ ; 
         }
-        if (count_r > 0){
-            p->vitesse.x = d_r.x*V_INITIALE ;
-            p->vitesse.y = d_r.y*V_INITIALE ;
-        }
-        if(count_o == NB_POISSONS){
-            p->vitesse.x = d_o.x*V_INITIALE ;
-            p->vitesse.y = d_o.y*V_INITIALE ;
-        }
-        if(count_a == NB_POISSONS){
-            p->vitesse.x = d_a.x*V_INITIALE ;
-            p->vitesse.y = d_a.y*V_INITIALE ;
-        }
-        if(count_o + count_a == NB_POISSONS){
-            p->vitesse.x = 0.5*(d_o.x + d_a.x)*V_INITIALE ;
-            p->vitesse.y = 0.5*(d_o.y + d_a.y)*V_INITIALE ;
-        }
     }
+    float n_r = norme(d_r);
+    float n_a = norme(d_a);
+    float n_o = norme(d_o);
+    if (count_r > 0 && n_r > 0) {
+        changement_direction(p,d_r);
+    }
+    else if(count_o > 0 && count_a > 0 && n_o > 0 && n_a > 0){
+        Vector2* d_a_bis = malloc(sizeof(Vector2));
+        Vector2* d_o_bis = malloc(sizeof(Vector2));
+        d_a_bis -> x = 0.5*d_a->x;
+        d_a_bis -> y = 0.5*d_a->y;
+        d_o_bis -> x = 0.5*d_o->x;
+        d_o_bis -> y = 0.5*d_o->y;
+        p->vitesse = changement_direction(p, d_a_bis);
+        p->vitesse = changement_direction(p, d_o_bis);
+        free(d_a_bis);
+        free(d_o_bis);
+    }
+    else if(count_o > 0 && n_o > 0 ){
+        p->vitesse = changement_direction(p, d_o);
+    }
+    else if(count_a > 0 && n_a > 0){
+        p->vitesse = changement_direction(p,d_a);
+    }
+    free(d_r);
+    free(d_a);
+    free(d_o);
 }
 
 
-
 void poisson_deplacer(Poisson* p){
+    float r = (((float)rand() / RAND_MAX)*2*BRUIT) - BRUIT;
+    p->vitesse.x = cosf(r)*p->vitesse.x - sinf(r)*p->vitesse.y;
+    p->vitesse.y = sinf(r)*p->vitesse.x + cosf(r)*p->vitesse.y;
     p->pos = vec_add(p->pos, p->vitesse);
 
     if(p->pos.x - TAILLE_POISSON <= 0 || p->pos.x + TAILLE_POISSON >= LARGEUR){
-        if(p->pos.x< TAILLE_POISSON) p->pos.x = LARGEUR - TAILLE_POISSON;
-        if(p->pos.x> LARGEUR - TAILLE_POISSON) p->pos.x = TAILLE_POISSON;
+        if(p->pos.x< TAILLE_POISSON){ 
+            p->pos.x = TAILLE_POISSON;
+            p->vitesse.x *= -1;
+        }        
+        if(p->pos.x> LARGEUR - TAILLE_POISSON){
+            p->pos.x = LARGEUR - TAILLE_POISSON;
+            p->vitesse.x *= -1;
+        }
     }
     if(p->pos.y - TAILLE_POISSON<= 0 || p->pos.y + TAILLE_POISSON >= HAUTEUR){
-        if(p->pos.y< TAILLE_POISSON) p->pos.y =  HAUTEUR - TAILLE_POISSON;
-        if(p->pos.y> HAUTEUR - TAILLE_POISSON) p->pos.y = TAILLE_POISSON;
+        if(p->pos.y< TAILLE_POISSON){
+            p->pos.y = TAILLE_POISSON;
+            p->vitesse.y *= -1;
+        }
+        if(p->pos.y> HAUTEUR - TAILLE_POISSON){
+            p->pos.y = HAUTEUR - TAILLE_POISSON;
+            p->vitesse.y *= -1;
+        }
     }
 }
 
@@ -151,9 +198,26 @@ void draw_circle(SDL_Renderer* renderer, int cx, int cy, int r) {
 }
 
 //dessine un poisson 
-void poisson_dessiner(Poisson* p, SDL_Renderer* renderer, SDL_Color c){
-    SDL_SetRenderDrawColor(renderer, c.r,c.g,c.b,255);
-    draw_circle(renderer,(int)p->pos.x,(int)p->pos.y,TAILLE_POISSON);
+void poisson_dessiner(Poisson* p, SDL_Renderer* renderer, SDL_Color c) {
+    SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 255);
+
+    // Dessine le corps (cercle)
+    draw_circle(renderer, (int)p->pos.x, (int)p->pos.y, TAILLE_POISSON);
+
+    // Normalisation de la vitesse pour direction
+    float n = sqrtf(p->vitesse.x * p->vitesse.x + p->vitesse.y * p->vitesse.y);
+    if (n > 0.001f) {
+        // Coordonnées de la queue
+        float dx = (p->vitesse.x / n) * TAILLE_POISSON * 2.0f;
+        float dy = (p->vitesse.y / n) * TAILLE_POISSON * 2.0f;
+
+        // On trace une ligne partant du centre vers l'arrière (queue)
+        SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255); // gris clair pour contraster
+        SDL_RenderDrawLine(renderer,
+            (int)p->pos.x, (int)p->pos.y,
+            (int)(p->pos.x - dx), (int)(p->pos.y - dy)
+        );
+    }
 }
 
 //
@@ -190,7 +254,7 @@ int main(){
         SDL_RenderClear(renderer);
 
         for(int i=0;i<NB_POISSONS;i++){
-            poisson_dessiner(&poissons[i],renderer,COULEURS[2]); // rouge
+            poisson_dessiner(&poissons[i],renderer,COULEURS[6]); // rouge
         }
 
         SDL_RenderPresent(renderer);

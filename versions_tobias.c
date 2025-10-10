@@ -6,13 +6,13 @@
 #include <time.h>
 
 //taille de l'ecran
-#define LARGEUR 1920
-#define HAUTEUR 1080
+#define LARGEUR 1000
+#define HAUTEUR 1000
 
 //valeurs aleatoires
-#define NB_POISSONS 300
-#define RAYON_ATTRACTION 100
-#define RAYON_ORIENTATION 50
+#define NB_POISSONS 150
+#define RAYON_ATTRACTION 200
+#define RAYON_ORIENTATION 100
 #define RAYON_REPULSION 10
 #define V_INITIALE 3.5
 #define TAILLE_POISSON 5
@@ -20,12 +20,10 @@
 #define BRUIT (float)0.02f
 #define BLIND M_PI
 
-//vecteur dans le plan 
 typedef struct {
-    float x, y;
+    floa(4/3)*t x, y;
 } Vector2;//nom à changer
 
-//parametre d'un poisson dans le plan
 typedef struct {
     Vector2 pos;
     Vector2 vitesse;
@@ -235,8 +233,8 @@ void poisson_dessiner(Poisson* p, SDL_Renderer* renderer, SDL_Color c1, SDL_Colo
 //
 int main(){
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window* window = SDL_CreateWindow("Poissons SDL",
-        SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,LARGEUR,HAUTEUR,SDL_WINDOW_FULLSCREEN);
+    SDL_Window* window = SDL_CreateWindow("MES POISSONS D'AMOUR",
+        SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,LARGEUR,HAUTEUR,SDL_WINDOW_SHOWN);
     SDL_Renderer* renderer = SDL_CreateRenderer(window,-1,SDL_RENDERER_ACCELERATED);
 
     srand(time(NULL));
@@ -270,7 +268,7 @@ int main(){
         SDL_RenderClear(renderer);
 
         for(int i=0;i<NB_POISSONS;i++){
-            poisson_dessiner(&poissons[i],renderer,COULEURS[6], COULEURS[0]); // noir
+            poisson_dessiner(&poissons[i],renderer,COULEURS[6], COULEURS[0]); 
         }
 
         SDL_RenderPresent(renderer);

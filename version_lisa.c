@@ -10,13 +10,12 @@
 #define HAUTEUR 1080
 
 //valeurs aleatoires
-#define NB_POISSONS 100
+#define NB_POISSONS 200
 #define RAYON_ATTRACTION 120
 #define RAYON_ORIENTATION 90
-#define RAYON_REPULSION 25
-#define V_INITIALE 3
+#define RAYON_REPULSION 40
+#define V_INITIALE 2
 #define TAILLE_POISSON 5
-#define BRUIT (float)0.2f
 #define BLIND M_PI
 
 //vecteur dans le plan 
@@ -80,10 +79,9 @@ Vector2* zone_attraction(Poisson* p, Poisson* v, Vector2* d){
     return d ; 
 }
 
-Vector2 changement_direction (Poisson* p, Vector2 *d){
+Vector2 changement_direction (Poisson* p, Vector2 *d, float alpha){
     float n = norme(d); 
     Vector2 cible = { (d->x/n)*V_INITIALE , (d->y/n)*V_INITIALE };
-    float alpha = 0.1; 
     p->vitesse.x = (1 - alpha)*p->vitesse.x + alpha*cible.x;
     p->vitesse.y = (1 - alpha)*p->vitesse.y + alpha*cible.y;
     float n_p = sqrtf(p->vitesse.x*p->vitesse.x + p->vitesse.y*p->vitesse.y);
@@ -94,7 +92,7 @@ Vector2 changement_direction (Poisson* p, Vector2 *d){
     return p->vitesse;
 }
 
-void mouvement(Poisson* p, Poisson voisin[NB_POISSONS]){
+void mouvement(Poisson* p, Poisson voisin[NB_POISSONS],float alpha){
     Vector2* d_r= malloc(sizeof(Vector2)); 
     Vector2* d_a= malloc(sizeof(Vector2)); 
     Vector2* d_o= malloc(sizeof(Vector2)); 
@@ -131,25 +129,25 @@ void mouvement(Poisson* p, Poisson voisin[NB_POISSONS]){
     float n_a = norme(d_a);
     float n_o = norme(d_o);
     if (count_r > 0 && n_r > 0) {
-        changement_direction(p,d_r);
+        changement_direction(p,d_r,alpha);
     }
     else if(count_o > 0 && count_a > 0 && n_o > 0 && n_a > 0){
         Vector2* d_a_bis = malloc(sizeof(Vector2));
         Vector2* d_o_bis = malloc(sizeof(Vector2));
-        d_a_bis -> x = 0.5*d_a->x;
-        d_a_bis -> y = 0.5*d_a->y;
-        d_o_bis -> x = 0.5*d_o->x;
-        d_o_bis -> y = 0.5*d_o->y;
-        p->vitesse = changement_direction(p, d_a_bis);
-        p->vitesse = changement_direction(p, d_o_bis);
+        d_a_bis -> x = 0.3*d_a->x;
+        d_a_bis -> y = 0.3*d_a->y;
+        d_o_bis -> x = 0.7*d_o->x;
+        d_o_bis -> y = 0.7*d_o->y;
+        p->vitesse = changement_direction(p, d_a_bis,alpha);
+        p->vitesse = changement_direction(p, d_o_bis,alpha);
         free(d_a_bis);
         free(d_o_bis);
     }
     else if(count_o > 0 && n_o > 0 ){
-        p->vitesse = changement_direction(p, d_o);
+        p->vitesse = changement_direction(p, d_o,alpha);
     }
     else if(count_a > 0 && n_a > 0){
-        p->vitesse = changement_direction(p,d_a);
+        p->vitesse = changement_direction(p,d_a,alpha);
     }
     free(d_r);
     free(d_a);
@@ -157,8 +155,8 @@ void mouvement(Poisson* p, Poisson voisin[NB_POISSONS]){
 }
 
 
-void poisson_deplacer(Poisson* p){
-    float r = (((float)rand() / RAND_MAX)*2*BRUIT) - BRUIT;
+void poisson_deplacer(Poisson* p, float bruit){
+    float r = (((float)rand() / RAND_MAX)*2*bruit) - bruit;
     p->vitesse.x = cosf(r)*p->vitesse.x - sinf(r)*p->vitesse.y;
     p->vitesse.y = sinf(r)*p->vitesse.x + cosf(r)*p->vitesse.y;
     p->pos = vec_add(p->pos, p->vitesse);
@@ -187,7 +185,6 @@ void poisson_deplacer(Poisson* p){
 
 //dessine un cercle
 void draw_circle(SDL_Renderer* renderer, int cx, int cy, int r) {
-    // Dessiner le cercle (boule)
     for(int w = -r; w <= r; w++) {
         for(int h = -r; h <= r; h++) {
             if(w*w + h*h <= r*r) {
@@ -208,11 +205,11 @@ void poisson_dessiner(Poisson* p, SDL_Renderer* renderer, SDL_Color c) {
     float n = sqrtf(p->vitesse.x * p->vitesse.x + p->vitesse.y * p->vitesse.y);
     if (n > 0.001f) {
         // Coordonnées de la queue
-        float dx = (p->vitesse.x / n) * TAILLE_POISSON * 2.0f;
-        float dy = (p->vitesse.y / n) * TAILLE_POISSON * 2.0f;
+        float dx = 2*(p->vitesse.x / n) * TAILLE_POISSON * 2.0f;
+        float dy = 2*(p->vitesse.y / n) * TAILLE_POISSON * 2.0f;
 
         // On trace une ligne partant du centre vers l'arrière (queue)
-        SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255); // gris clair pour contraster
+        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // gris clair pour contraster
         SDL_RenderDrawLine(renderer,
             (int)p->pos.x, (int)p->pos.y,
             (int)(p->pos.x - dx), (int)(p->pos.y - dy)
@@ -226,9 +223,9 @@ int main(){
     SDL_Window* window = SDL_CreateWindow("Poissons SDL",
         SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,LARGEUR,HAUTEUR,SDL_WINDOW_FULLSCREEN);
     SDL_Renderer* renderer = SDL_CreateRenderer(window,-1,SDL_RENDERER_ACCELERATED);
-
     srand(time(NULL));
-
+    float alpha = 0.2; 
+    float bruit = 0.1; 
     Poisson poissons[NB_POISSONS];
     for(int i=0;i<NB_POISSONS;i++){
         float angle = ((float)rand()/RAND_MAX)*2*M_PI;
@@ -244,12 +241,12 @@ int main(){
             if(e.type==SDL_QUIT) running=false;
             if(e.type==SDL_KEYDOWN && e.key.keysym.sym==SDLK_q) running=false;
         }
-
-        for(int i=0;i<NB_POISSONS;i++) {
-            poisson_deplacer(&poissons[i]);
-            mouvement(&poissons[i],poissons);
+        for (int i = 0; i < NB_POISSONS; i++){
+            mouvement(&poissons[i], poissons,alpha);
         }
-
+        for (int i = 0; i < NB_POISSONS; i++){
+            poisson_deplacer(&poissons[i],bruit);
+        }
         SDL_SetRenderDrawColor(renderer,0,0,0,255);
         SDL_RenderClear(renderer);
 
@@ -259,8 +256,39 @@ int main(){
 
         SDL_RenderPresent(renderer);
         SDL_Delay(15);
+        while(SDL_PollEvent(&e)){
+            if(e.type==SDL_QUIT) {
+                running=false;
+            }
+            if(e.type==SDL_KEYDOWN){
+                switch(e.key.keysym.sym){
+                case SDLK_q: running=false; 
+                break;
+                case SDLK_UP: alpha += 0.01f; 
+                if(alpha>1.0f){
+                    alpha=1.0f; 
+                    break;
+                }
+                case SDLK_DOWN: alpha -= 0.01f; 
+                if(alpha<0.0f) {
+                    alpha=0.0f; 
+                    break;
+                }
+                case SDLK_RIGHT: bruit += 0.01f; 
+                if(bruit>1.0f) {
+                    bruit=1.0f; break;
+                }
+                case SDLK_LEFT: bruit -= 0.01f; 
+                if(bruit<0.0f) {
+                        bruit=0.0f; break;
+                }
+                }
+            }
+        }
     }
-
+    char titre[100];
+    sprintf(titre, "Poissons SDL - alpha=%.2f, bruit=%.2f", alpha, bruit);
+    SDL_SetWindowTitle(window, titre);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

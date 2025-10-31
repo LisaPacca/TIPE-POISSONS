@@ -1,0 +1,11 @@
+// CYCLE PARFAIT
+
+#define NB_POISSONS 150
+#define RAYON_ATTRACTION 200
+#define RAYON_ORIENTATION 100
+#define RAYON_REPULSION 17
+#define V_INITIALE 3.5
+#define TAILLE_POISSON 5
+#define ALPHA 0.1
+#define BRUIT (float)0.02f
+#define BLIND M_PI

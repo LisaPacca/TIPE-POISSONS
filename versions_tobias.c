@@ -17,7 +17,7 @@
 #define V_INITIALE 3.5
 #define TAILLE_POISSON 5
 #define ALPHA 0.1
-#define BRUIT (float)0.02f
+#define BRUIT 0.05
 #define BLIND M_PI
 
 typedef struct {
@@ -159,7 +159,7 @@ void zone_orientation(Poisson* p, Poisson voisin[NB_POISSONS]){
                 p->vitesse.y = ((p->vitesse.y)/v)*V_INITIALE;
             }
         }
-    }
+    }       
     free(d);
 }
 
@@ -273,7 +273,9 @@ void poisson_dessiner(Poisson* p, SDL_Renderer* renderer, SDL_Color c1, SDL_Colo
     SDL_SetRenderDrawColor(renderer, c4.r,c4.g,c4.b,255);
     }
     else {SDL_SetRenderDrawColor(renderer, c2.r,c2.g,c2.b,255);}
-    draw_circle(renderer,(int)(p->pos.x + p->vitesse.x * 2),(int)(p->pos.y + p->vitesse.y * 2),TAILLE_POISSON);
+    float dx = (p->vitesse.x / normer(p->vitesse)) * TAILLE_POISSON * 2.0f;
+    float dy = (p->vitesse.y / normer(p->vitesse)) * TAILLE_POISSON * 2.0f;
+    draw_circle(renderer,(int)(p->pos.x + 3.5/5 * dx),(int)(p->pos.y + 3.5/5 * dy),TAILLE_POISSON);
     float n = sqrtf(p->vitesse.x * p->vitesse.x + p->vitesse.y * p->vitesse.y);
     if (n > 0.001f) {
         float dx = (p->vitesse.x / n) * TAILLE_POISSON * 2.0f;
@@ -284,7 +286,46 @@ void poisson_dessiner(Poisson* p, SDL_Renderer* renderer, SDL_Color c1, SDL_Colo
     }
 }
 
-void moyenne_position(){}
+Vector2 moyenne_position(Poisson poisson[NB_POISSONS], SDL_Renderer* renderer, int nb_frame){
+    float mx = 0;
+    float my = 0;
+    for(int i=0; i<NB_POISSONS; i++){
+        mx += poisson[i].pos.x;
+        my += poisson[i].pos.y;
+    }
+    mx = mx / NB_POISSONS;
+    my = my / NB_POISSONS;
+    draw_circle(renderer, (int)mx, (int)my, TAILLE_POISSON);
+    if(nb_frame % 100 == 0){
+        printf("Moyenne position : (%.2f, %.2f)\n", mx, my); 
+    }
+    return (Vector2){mx, my};
+}
+
+void distance_a_moy(Poisson poisson[NB_POISSONS], Vector2 moy){
+    float max = 0;
+    float min = 0;
+    for(int i=0; i<NB_POISSONS; i++){
+        float dist = distance(poisson[i].pos, moy);
+        printf("Distance du poisson : %d  à la moyenne --> %.2f\n", i, dist);
+        if(i == 0){
+            max = dist;
+            min = dist;
+        }
+        else {
+            if(dist > max){
+                max = dist;
+            }
+            if(dist < min){
+                min = dist;
+            }
+        }
+    }
+    bool cycle = max - min < 150;
+    printf("Cycle ? %s\n", cycle ? "Oui" : "Non");
+
+
+}
 
 //
 int main(){
@@ -305,12 +346,10 @@ int main(){
 
     bool running=true;
     SDL_Event e;
-    while(running){
-        while(SDL_PollEvent(&e)){
-            if(e.type==SDL_QUIT) running=false;
-            if(e.type==SDL_KEYDOWN && e.key.keysym.sym==SDLK_q) running=false;
-        }
+    int nb_frame = 0;
+    bool touche_d_enfoncee = false;
 
+    while(running){
         for(int i=0;i<NB_POISSONS;i++) {
             poisson_deplacer(&poissons[i]);
             bool zr = zone_repulsion(&poissons[i],poissons);
@@ -326,10 +365,21 @@ int main(){
         for(int i=NB_POISSONS-1 ;i>=0;i--){
             poisson_dessiner(&poissons[i],renderer,COULEURS[7] /*cyan*/, COULEURS[0]/*blanc*/,  COULEURS[4] /*vert*/, COULEURS[2] /*rouge*/,poissons); 
         }
-        
+        SDL_SetRenderDrawColor(renderer,255,165,0,255);
+        Vector2 moy = moyenne_position(poissons, renderer, nb_frame);   
+
+        while(SDL_PollEvent(&e)){
+            if(e.type==SDL_QUIT) running=false;
+            if(e.type==SDL_KEYDOWN && e.key.keysym.sym==SDLK_q) running=false;
+            if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_d) {
+                distance_a_moy(poissons, moy);
+            }
+        }
+
 
         SDL_RenderPresent(renderer);
         SDL_Delay(15);
+        nb_frame++;
     }
 
     SDL_DestroyRenderer(renderer);

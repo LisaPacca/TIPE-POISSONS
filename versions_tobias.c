@@ -28,7 +28,9 @@ struct Poisson{
     Vector2 pos;
     Vector2 vitesse;
     struct Poisson* tab_orientation[NB_POISSONS];
+    struct Poisson* tab_attraction[NB_POISSONS];
     int id;
+    bool infecte;
 };
 typedef struct Poisson Poisson;
 
@@ -68,7 +70,10 @@ void poisson_init(Poisson* p, float x, float y, float angle, int i){
     p->vitesse = (Vector2){cosf(angle)*V_INITIALE, sinf(angle)*V_INITIALE}; 
     for(int i=0; i<NB_POISSONS; i++){
         p->tab_orientation[i] = NULL;
+        p->tab_attraction[i] = NULL;
     }
+    p->infecte = false;
+    if(i==0){p->infecte = true;}
     p->id = i;   
 }
 
@@ -140,6 +145,7 @@ void zone_orientation(Poisson* p, Poisson voisin[NB_POISSONS]){
             d->x += v->vitesse.x/sqrtf((v->vitesse.x)*(v->vitesse.x)+(v->vitesse.y)*(v->vitesse.y));
             d->y += v->vitesse.y/sqrtf((v->vitesse.x)*(v->vitesse.x)+(v->vitesse.y)*(v->vitesse.y));
             p->tab_orientation[j] = v;
+            v->infecte = true;
         }
         else{
             p->tab_orientation[j] = NULL;
@@ -178,6 +184,10 @@ void zone_attration(Poisson* p, Poisson voisin[NB_POISSONS]){
             count++;
             d->x += (v->pos.x - p->pos.x)/distance(v->pos,p->pos)*V_INITIALE;
             d->y += (v->pos.y - p->pos.y)/distance(v->pos,p->pos)*V_INITIALE;
+            p->tab_attraction[j] = v;
+        }
+        else{
+            p->tab_attraction[j] = NULL;
         }
     }
     if(count != 0){
@@ -253,24 +263,20 @@ void draw_circle(SDL_Renderer* renderer, int cx, int cy, int r) {
     }
 }
 
-void draw_circle_full(SDL_Renderer* renderer, int cx, int cy, int r) {
-    for(int w = -r; w <= r; w++) {
-        for(int h = -r; h <= r; h++) {
-            if(w*w + h*h <= r*r) {
-                SDL_RenderDrawPoint(renderer, cx + w, cy + h);
-            }
-        }
-    }
-}
-
 //dessine un poisson 
-void poisson_dessiner(Poisson* p, SDL_Renderer* renderer, SDL_Color c1, SDL_Color c2, SDL_Color c3, SDL_Color c4,Poisson voisin[NB_POISSONS]){
+void poisson_dessiner(Poisson* p, SDL_Renderer* renderer, SDL_Color c1, SDL_Color c2, SDL_Color c3, SDL_Color c4,SDL_Color c5,SDL_Color c6, Poisson voisin[NB_POISSONS]){
     SDL_SetRenderDrawColor(renderer, c1.r,c1.g,c1.b,255);
     draw_circle(renderer,(int)p->pos.x,(int)p->pos.y,TAILLE_POISSON);
     if(p == &voisin[0]){SDL_SetRenderDrawColor(renderer, c3.r,c3.g,c3.b,255);
     }
+    else if(p->infecte && !appartient(p, voisin[0].tab_orientation) && !appartient(p, voisin[0].tab_attraction)) {
+        SDL_SetRenderDrawColor(renderer, c5.r,c5.g,c5.b,255);
+    }
     else if (appartient(p, voisin[0].tab_orientation)) {
-    SDL_SetRenderDrawColor(renderer, c4.r,c4.g,c4.b,255);
+        SDL_SetRenderDrawColor(renderer, c4.r,c4.g,c4.b,255);
+    }
+    else if (appartient(p, voisin[0].tab_attraction)) {
+        SDL_SetRenderDrawColor(renderer, c6.r,c6.g,c6.b,255);
     }
     else {SDL_SetRenderDrawColor(renderer, c2.r,c2.g,c2.b,255);}
     float dx = (p->vitesse.x / normer(p->vitesse)) * TAILLE_POISSON * 2.0f;
@@ -281,12 +287,22 @@ void poisson_dessiner(Poisson* p, SDL_Renderer* renderer, SDL_Color c1, SDL_Colo
         float dx = (p->vitesse.x / n) * TAILLE_POISSON * 2.0f;
         float dy = (p->vitesse.y / n) * TAILLE_POISSON * 2.0f;
         SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
-        SDL_RenderDrawLine(renderer,(int)p->pos.x, (int)p->pos.y,(int)(p->pos.x - dx), (int)(p->pos.y - dy)
-        );
+        SDL_RenderDrawLine(renderer,(int)p->pos.x, (int)p->pos.y,(int)(p->pos.x - dx), (int)(p->pos.y - dy));
     }
 }
 
-Vector2 moyenne_position(Poisson poisson[NB_POISSONS], SDL_Renderer* renderer, int nb_frame){
+float rayon_moyen(Poisson poisson[NB_POISSONS], float mx, float my,SDL_Renderer* renderer){
+    float sum = 0;
+    for(int i=0; i<NB_POISSONS; i++){
+        sum += sqrtf((poisson[i].pos.x - mx)*(poisson[i].pos.x - mx) + (poisson[i].pos.y - my)*(poisson[i].pos.y - my));
+    }
+    float rayonmoyen = sum / NB_POISSONS;
+    draw_circle(renderer, (int)mx, (int)my, (int)rayonmoyen);
+
+}
+
+
+Vector2 moyenne_position(Poisson poisson[NB_POISSONS], SDL_Renderer* renderer, int nb_frame, Vector2 moy_prec){
     float mx = 0;
     float my = 0;
     for(int i=0; i<NB_POISSONS; i++){
@@ -296,18 +312,14 @@ Vector2 moyenne_position(Poisson poisson[NB_POISSONS], SDL_Renderer* renderer, i
     mx = mx / NB_POISSONS;
     my = my / NB_POISSONS;
     draw_circle(renderer, (int)mx, (int)my, TAILLE_POISSON);
-    if(nb_frame % 100 == 0){
-        printf("Moyenne position : (%.2f, %.2f)\n", mx, my); 
-    }
-    return (Vector2){mx, my};
-}
+    bool dist_moy = distance((Vector2){mx, my}, moy_prec) < 30;
+    
 
-void distance_a_moy(Poisson poisson[NB_POISSONS], Vector2 moy){
+    
     float max = 0;
     float min = 0;
     for(int i=0; i<NB_POISSONS; i++){
-        float dist = distance(poisson[i].pos, moy);
-        printf("Distance du poisson : %d  à la moyenne --> %.2f\n", i, dist);
+        float dist = sqrtf((poisson[i].pos.x - mx)*(poisson[i].pos.x - mx) + (poisson[i].pos.y - my)*(poisson[i].pos.y - my));
         if(i == 0){
             max = dist;
             min = dist;
@@ -320,12 +332,46 @@ void distance_a_moy(Poisson poisson[NB_POISSONS], Vector2 moy){
                 min = dist;
             }
         }
+    };
+    bool cycle = ((max-min)<600) && dist_moy;
+    if(cycle){
+        rayon_moyen(poisson, mx, my,renderer);
+        draw_circle(renderer, (int)mx, (int)my, min);
+        draw_circle(renderer, (int)mx, (int)my, max);
     }
-    bool cycle = max - min < 150;
-    printf("Cycle ? %s\n", cycle ? "Oui" : "Non");
 
-
+    if(nb_frame % 100 == 0){
+        printf("Moyenne position : (%.2f, %.2f)\n", mx, my);
+        printf("Cycle ? %s\n", cycle ? "Oui" : "Non");
+        if(nb_frame % 100 == 0 && !dist_moy){
+            printf("    -> probleme distance à ancienne moyenne : %.2f \n", distance((Vector2){mx, my}, moy_prec));
+        }
+        else if(nb_frame % 100 == 0 && (max-min)>=600){
+            printf("    -> probleme dispersion des poissons : %d \n", (int)(max-min));
+        }
+        printf("\n");
+    }
+    
+    return (Vector2){mx, my};
 }
+
+void cycle_infecte(Poisson poisson[NB_POISSONS], int nb_frame){
+    bool all_infecte = true;
+    for(int i=0; i<NB_POISSONS; i++){
+        if(!poisson[i].infecte){
+            if(nb_frame % 200 == 0){
+            printf("Poisson %d n'est pas infecté.\n", poisson[i].id);
+            }
+
+            all_infecte = false;
+        }
+    }
+    if(all_infecte){
+        printf("Tous les poissons sont infectés !\n");
+    }
+}
+
+
 
 //
 int main(){
@@ -347,7 +393,7 @@ int main(){
     bool running=true;
     SDL_Event e;
     int nb_frame = 0;
-    bool touche_d_enfoncee = false;
+    Vector2 moy = {0,0};
 
     while(running){
         for(int i=0;i<NB_POISSONS;i++) {
@@ -357,22 +403,26 @@ int main(){
                 zone_orientation(&poissons[i],poissons);
                 zone_attration(&poissons[i],poissons);
             }
+           /* if(poissons[i].id != 0){
+                (&poissons[i])->infecte = false;
+            }
+            cycle_infecte(poissons, nb_frame); */
         }
 
         SDL_SetRenderDrawColor(renderer,0,0,0,255);
         SDL_RenderClear(renderer);
 
         for(int i=NB_POISSONS-1 ;i>=0;i--){
-            poisson_dessiner(&poissons[i],renderer,COULEURS[7] /*cyan*/, COULEURS[0]/*blanc*/,  COULEURS[4] /*vert*/, COULEURS[2] /*rouge*/,poissons); 
+            poisson_dessiner(&poissons[i],renderer,COULEURS[7] /*cyan*/, COULEURS[0]/*blanc*/,  COULEURS[4] /*vert*/, COULEURS[2] /*rouge*/,COULEURS[8] /*violet*/ ,COULEURS[5] /*jaune*/,poissons); 
         }
         SDL_SetRenderDrawColor(renderer,255,165,0,255);
-        Vector2 moy = moyenne_position(poissons, renderer, nb_frame);   
+        Vector2 moy = moyenne_position(poissons, renderer, nb_frame, moy);   
 
         while(SDL_PollEvent(&e)){
             if(e.type==SDL_QUIT) running=false;
             if(e.type==SDL_KEYDOWN && e.key.keysym.sym==SDLK_q) running=false;
             if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_d) {
-                distance_a_moy(poissons, moy);
+                //
             }
         }
 
